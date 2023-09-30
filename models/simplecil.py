@@ -47,7 +47,7 @@ class Learner(BaseLearner):
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
             cos = torch.matmul(embedding, embedding.transpose(0, 1))
-            cos = torch.acos(cos).mean(0)
+            cos = cos.mean(0)
             proto= (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
         return model
