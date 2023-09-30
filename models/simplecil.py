@@ -1,3 +1,4 @@
+import sklearn
 import logging
 import numpy as np
 import torch
@@ -45,7 +46,9 @@ class Learner(BaseLearner):
             # print('Replacing...',class_index)
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
-            proto=embedding.mean(0)
+            cos = torch.matmul(embedding, embedding.transpose(0, 1))
+            cos = torch.mean(cos, dim=0)
+            proto=(cos*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
         return model
 
