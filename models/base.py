@@ -12,6 +12,7 @@ batch_size = 64
 
 class BaseLearner(object):
     def __init__(self, args):
+        self.knn = None
         self._cur_task = -1
         self._known_classes = 0
         self._total_classes = 0
@@ -154,7 +155,15 @@ class BaseLearner(object):
         for _, (_, inputs, targets) in enumerate(loader):
             inputs = inputs.to(self._device)
             with torch.no_grad():
-                outputs = self._network(inputs)["logits"]
+                if isinstance(self._network, nn.DataParallel):
+                    vectors = tensor2numpy(
+                        self._network.module.extract_vector(inputs)
+                    )
+                else:
+                    vectors = tensor2numpy(
+                        self._network.extract_vector(inputs)
+                    )
+                outputs = torch.from_numpy(self.knn.predict_proba(vectors))
             predicts = torch.topk(
                 outputs, k=self.topk, dim=1, largest=True, sorted=True
             )[
