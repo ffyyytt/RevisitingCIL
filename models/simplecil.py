@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from sklearn.neighbors import KNeighborsClassifier
 from utils.inc_net import IncrementalNet,SimpleCosineIncrementalNet,SimpleVitNet
 from models.base import BaseLearner
 from utils.toolkit import target2onehot, tensor2numpy
@@ -48,9 +49,11 @@ class Learner(BaseLearner):
             embedding=embedding_list[data_index]
             embedding=torch.nn.functional.normalize(embedding, dim=-1)
             cos = torch.matmul(embedding, embedding.transpose(0, 1))
-            cos = (1-torch.mean(cos, dim = 1))**3
+            cos = (1-torch.mean(cos, dim = 1))**2.8
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
+        self.knn = KNeighborsClassifier(n_neighbors=10, metric="cosine")
+        self.knn.fit(embedding_list, label_list)
         return model
 
    
