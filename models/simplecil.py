@@ -53,7 +53,7 @@ class Learner(BaseLearner):
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
         if not self.knn:
-            self.knn = KNNClassifier(n_neighbors=5, max_window_size=50000, metric="euclidean")
+            self.knn = KNNClassifier(n_neighbors=3, max_window_size=500000, metric="euclidean")
         self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
