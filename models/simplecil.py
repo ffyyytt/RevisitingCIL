@@ -38,7 +38,7 @@ class Learner(BaseLearner):
                 embedding=model.convnet(data)
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
-        embedding_list = torch.cat(embedding_list, dim=0)
+        embedding_list = torch.nn.functional.normalize(torch.cat(embedding_list, dim=0), dim=-1)
         label_list = torch.cat(label_list, dim=0)
 
         class_list=np.unique(self.train_dataset.labels)
@@ -53,7 +53,7 @@ class Learner(BaseLearner):
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
         if not self.knn:
-            self.knn = KNNClassifier(n_neighbors=5, max_window_size=5000, metric="euclidean")
+            self.knn = KNNClassifier(n_neighbors=5, max_window_size=50000, metric="euclidean")
         self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
