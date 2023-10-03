@@ -6,6 +6,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from utils.toolkit import tensor2numpy, accuracy
 from scipy.spatial.distance import cdist
+from tqdm.notebook import *
 
 EPSILON = 1e-8
 batch_size = 64
@@ -152,7 +153,7 @@ class BaseLearner(object):
     def _eval_cnn(self, loader):
         self._network.eval()
         y_pred, y_true = [], []
-        for _, (_, inputs, targets) in enumerate(loader):
+        for _, (_, inputs, targets) in enumerate(tqdm(loader)):
             inputs = inputs.to(self._device)
             with torch.no_grad():
                 if isinstance(self._network, nn.DataParallel):
@@ -163,6 +164,11 @@ class BaseLearner(object):
                     vectors = tensor2numpy(
                         self._network.extract_vector(inputs)
                     )
+                cos = torch.matmul(vectors, self.features.transpose(0, 1))
+                outpus = [0]*len(cos)
+                for i in range(len(cos)):
+                    for j in range(self._known_classes):
+                        outputs[i][j] = min(cos[i][self.labels == j])
                 outputs = torch.from_numpy(self.knn.predict_proba(vectors))
             predicts = torch.topk(
                 outputs, k=self.topk, dim=1, largest=True, sorted=True

@@ -52,9 +52,12 @@ class Learner(BaseLearner):
             cos = (1-torch.mean(cos, dim = 1))**2.8
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
-        if not self.knn:
-            self.knn = KNNADWINClassifier(n_neighbors=1, max_window_size=100000, leaf_size=10000, metric="euclidean")
-        self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
+        if not self.features:
+            self.features = embedding_list
+            self.labels = label_list
+        else:
+            self.features = torch.cat((self.features, embedding_list), dim=0)
+            self.labels = torch.cat((self.labels, label_list), dim=0)
         return model
 
    
