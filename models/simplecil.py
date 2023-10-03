@@ -31,13 +31,21 @@ class Learner(BaseLearner):
         embedding_list = []
         label_list = []
         with torch.no_grad():
-            for i, batch in enumerate(trainloader):
+            for i, batch in enumerate(tqdm(trainloader)):
                 (_,data,label)=batch
                 data=data.cuda()
                 label=label.cuda()
                 embedding=model.convnet(data)
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
+
+                if not self.knn:
+                    self.knn = True
+                    self.features = embedding
+                    self.labels = label
+                else:
+                    self.features = torch.cat((self.features, embedding), dim=0)
+                    self.labels = torch.cat((self.labels, label), dim=0)
         embedding_list = torch.nn.functional.normalize(torch.cat(embedding_list, dim=0), dim=-1)
         label_list = torch.cat(label_list, dim=0)
 
@@ -52,12 +60,6 @@ class Learner(BaseLearner):
             cos = (1-torch.mean(cos, dim = 1))**2.8
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
-        if not self.features:
-            self.features = embedding_list
-            self.labels = label_list
-        else:
-            self.features = torch.cat((self.features, embedding_list), dim=0)
-            self.labels = torch.cat((self.labels, label_list), dim=0)
         return model
 
    

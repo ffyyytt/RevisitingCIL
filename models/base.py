@@ -13,7 +13,7 @@ batch_size = 64
 
 class BaseLearner(object):
     def __init__(self, args):
-        self.knn = None
+        self.knn = False
         self._cur_task = -1
         self._known_classes = 0
         self._total_classes = 0
@@ -157,13 +157,9 @@ class BaseLearner(object):
             inputs = inputs.to(self._device)
             with torch.no_grad():
                 if isinstance(self._network, nn.DataParallel):
-                    vectors = tensor2numpy(
-                        self._network.module.extract_vector(inputs)
-                    )
+                    vectors = self._network.module.extract_vector(inputs)
                 else:
-                    vectors = tensor2numpy(
-                        self._network.extract_vector(inputs)
-                    )
+                    vectors = self._network.extract_vector(inputs)
                 cos = torch.matmul(vectors, self.features.transpose(0, 1))
                 outpus = [0]*len(cos)
                 for i in range(len(cos)):
