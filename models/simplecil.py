@@ -8,7 +8,7 @@ from tqdm import tqdm
 from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from skmultiflow.lazy import KNNClassifier
+from skmultiflow.lazy import KNNADWINClassifier
 from utils.inc_net import IncrementalNet,SimpleCosineIncrementalNet,SimpleVitNet
 from models.base import BaseLearner
 from utils.toolkit import target2onehot, tensor2numpy
@@ -53,7 +53,7 @@ class Learner(BaseLearner):
             proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
             self._network.fc.weight.data[class_index]=proto
         if not self.knn:
-            self.knn = KNNADWINClassifier(n_neighbors=1, max_window_size=100000, leaf_size=1000, metric="euclidean")
+            self.knn = KNNADWINClassifier(n_neighbors=1, max_window_size=100000, leaf_size=10, metric="euclidean")
         self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
