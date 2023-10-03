@@ -151,26 +151,27 @@ class BaseLearner(object):
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
     def _eval_cnn(self, loader):
+        self.labelmap = {i:x for i, x in enumerate(self.labels)}
         self._network.eval()
         y_pred, y_true = [], []
         for _, (_, inputs, targets) in enumerate(tqdm(loader)):
             inputs = inputs.to(self._device)
             with torch.no_grad():
                 if isinstance(self._network, nn.DataParallel):
-                    vectors = self._network.module.extract_vector(inputs)
+                    vectors = torch.nn.functional.normalize(self._network.module.extract_vector(inputs), dim=-1)
                 else:
-                    vectors = self._network.extract_vector(inputs)
-                cos = torch.matmul(vectors, self.features.transpose(0, 1))
-                outpus = [0]*len(cos)
-                for i in range(len(cos)):
-                    for j in range(self._known_classes):
-                        outputs[i][j] = min(cos[i][self.labels == j])
-                outputs = torch.from_numpy(self.knn.predict_proba(vectors))
-            predicts = torch.topk(
-                outputs, k=self.topk, dim=1, largest=True, sorted=True
-            )[
-                1
-            ]  # [bs, topk]
+                    vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
+            cos = torch.matmul(vectors, self.features.transpose(0, 1))
+            predicts = torch.topk(cos, k=100*self.topk, dim=1, largest=True, sorted=True)[1]
+            predicts = predicts.cpu().numpy()
+            
+            outputs = np.zeros([len(predicts), len(self.labelmap)])
+            for i in range(len(predicts)):
+                for k in predicts[i]:
+                    outputs[i][self.labelmap[k]] += 1
+            
+            predicts = torch.topk(outputs, k=100*self.topk, dim=1, largest=True, sorted=True)[1]
+            
             y_pred.append(predicts.cpu().numpy())
             y_true.append(targets.cpu().numpy())
 
