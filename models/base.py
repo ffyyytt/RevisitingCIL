@@ -161,7 +161,7 @@ class BaseLearner(object):
                     vectors = torch.nn.functional.normalize(self._network.module.extract_vector(inputs), dim=-1)
                 else:
                     vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
-                outputs_knn = torch.from_numpy(self.knn.predict_proba(vectors))
+                outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
             cos = torch.matmul(vectors, self.features.transpose(0, 1))
             predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
