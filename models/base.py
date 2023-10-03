@@ -166,12 +166,12 @@ class BaseLearner(object):
             predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
             
-            outputs_cos = np.zeros([len(predicts), len(self.labelmap)])
+            outputs_cos = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
             for i in range(len(predicts)):
                 for k in predicts[i]:
                     outputs_cos[i][self.labelmap[k]] += 1
             
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos)) + torch.from_numpy(outputs_knn)
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + 1.5*torch.from_numpy(outputs_knn)
             predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
             
             
