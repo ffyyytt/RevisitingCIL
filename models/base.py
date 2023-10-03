@@ -161,18 +161,21 @@ class BaseLearner(object):
                     vectors = torch.nn.functional.normalize(self._network.module.extract_vector(inputs), dim=-1)
                 else:
                     vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
+                outputs_knn = torch.from_numpy(self.knn.predict_proba(vectors))
             cos = torch.matmul(vectors, self.features.transpose(0, 1))
-            predicts = torch.topk(cos, k=100*self.topk, dim=1, largest=True, sorted=True)[1]
+            predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
             
-            outputs = np.zeros([len(predicts), len(self.labelmap)])
+            outputs_cos = np.zeros([len(predicts), len(self.labelmap)])
             for i in range(len(predicts)):
                 for k in predicts[i]:
-                    outputs[i][self.labelmap[k]] += 1
+                    outputs_cos[i][self.labelmap[k]] += 1
             
-            predicts = torch.topk(outputs, k=100*self.topk, dim=1, largest=True, sorted=True)[1]
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos)) + torch.from_numpy(outputs_knn)
+            predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
             
-            y_pred.append(predicts.cpu().numpy())
+            
+            y_pred.append(predicts.numpy())
             y_true.append(targets.cpu().numpy())
 
         return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
