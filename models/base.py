@@ -171,7 +171,7 @@ class BaseLearner(object):
                 for k in predicts[i]:
                     outputs_cos[i][self.labelmap[k]] += 1
             
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + 1.2*torch.from_numpy(outputs_knn)
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + 1.8*torch.from_numpy(outputs_knn)
             predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
             
             
