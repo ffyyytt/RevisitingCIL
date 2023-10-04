@@ -164,7 +164,7 @@ class BaseLearner(object):
                 outputs_fc = self._network(inputs)["logits"].cpu()
                 # outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
                 cos = torch.matmul(vectors, self.features.transpose(0, 1))
-            predicts = torch.topk(cos, k=50*self.topk, dim=1, largest=True, sorted=True)[1]
+            predicts = torch.topk(cos, k=15*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
             
             outputs_cos = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
