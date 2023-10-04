@@ -175,7 +175,7 @@ class BaseLearner(object):
             
             output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
                      3*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
-                     1.05*torch.from_numpy(outputs_knn) + \
+                     torch.from_numpy(outputs_knn) + \
                      torch.from_numpy(outputs_knn_manhattan) 
 
             predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
