@@ -40,7 +40,14 @@ class Learner(BaseLearner):
                 label_list.append(label.cpu())
 
                 if not self.knn:
-                    self.knn = KNNClassifier(n_neighbors=1, max_window_size=1000000, leaf_size=1000, metric="euclidean")
+                    self.knn = KNNClassifier(n_neighbors=1, 
+                                             max_window_size=1000000, 
+                                             leaf_size=1000,
+                                             metric="euclidean")
+                    self.knn_manhattan = KNNClassifier(n_neighbors=1, 
+                                                       max_window_size=1000000, 
+                                                       leaf_size=1000,
+                                                       metric="manhattan")
                     self.features = embedding
                     self.labels = label
                 else:
@@ -62,6 +69,7 @@ class Learner(BaseLearner):
             self._network.fc.weight.data[class_index]=proto
             
         self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
+        self.knn_manhattan.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
    
