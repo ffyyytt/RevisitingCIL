@@ -174,7 +174,7 @@ class BaseLearner(object):
                     outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
             
             output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
-                     3*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
+                     2.5*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
                      torch.from_numpy(outputs_knn) + \
                      torch.from_numpy(outputs_knn_manhattan) 
 
