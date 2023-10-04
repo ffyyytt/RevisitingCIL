@@ -40,7 +40,7 @@ class Learner(BaseLearner):
                 label_list.append(label.cpu())
 
                 if not self.knn:
-                    self.knn = KNNClassifier(n_neighbors=1, max_window_size=100000, leaf_size=1000, metric="euclidean")
+                    self.knn = KNNClassifier(n_neighbors=1, max_window_size=1000000, leaf_size=1000, metric="euclidean")
                     self.features = embedding
                     self.labels = label
                 else:

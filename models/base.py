@@ -162,17 +162,20 @@ class BaseLearner(object):
                 else:
                     vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
                 outputs_fc = self._network(inputs)["logits"].cpu()
-                # outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
+                outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
                 cos = torch.matmul(vectors, self.features.transpose(0, 1))
-            predicts = torch.topk(cos, k=15*self.topk, dim=1, largest=True, sorted=True)[1]
+            predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
             
             outputs_cos = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
             for i in range(len(predicts)):
                 for j, k in enumerate(predicts[i]):
-                    outputs_cos[i][self.labelmap[k]] += 1/(3**j)
+                    outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
             
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + torch.nn.functional.softmax(output_fc) # + 1.3*torch.from_numpy(outputs_knn) 
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
+                    3*torch.nn.functional.softmax(8*outputs_fc) + \
+                    1.5*torch.from_numpy(outputs_knn) 
+
             predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
             
             
