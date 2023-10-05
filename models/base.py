@@ -168,17 +168,24 @@ class BaseLearner(object):
             predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
             predicts = predicts.cpu().numpy()
             
-            outputs_cos = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
+            outputs_cos0 = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
             for i in range(len(predicts)):
                 for j, k in enumerate(predicts[i]):
                     outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
+                    
+            outputs_cos1 = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
+            for i in range(len(predicts)):
+                for j, k in enumerate(predicts[i]):
+                    outputs_cos[i][self.labelmap[k]] += 1
             
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
-                     # 2.5*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos0), dim=0) + \
+                     0.9*torch.nn.functional.softmax(torch.from_numpy(outputs_cos1), dim=0) +\
+                     2.4*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
                      torch.from_numpy(outputs_knn) + \
                      torch.from_numpy(outputs_knn_manhattan) 
 
             predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
+            targets = targets.cpu()
             
             
             y_pred.append(predicts.numpy())
