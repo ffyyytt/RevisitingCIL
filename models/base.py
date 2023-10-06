@@ -6,14 +6,12 @@ from torch import nn
 from torch.utils.data import DataLoader
 from utils.toolkit import tensor2numpy, accuracy
 from scipy.spatial.distance import cdist
-from tqdm.notebook import *
 
 EPSILON = 1e-8
 batch_size = 64
 
 class BaseLearner(object):
     def __init__(self, args):
-        self.knn = False
         self._cur_task = -1
         self._known_classes = 0
         self._total_classes = 0
@@ -151,44 +149,18 @@ class BaseLearner(object):
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
     def _eval_cnn(self, loader):
-        self.labelmap = {i:x for i, x in enumerate(self.labels)}
         self._network.eval()
         y_pred, y_true = [], []
         for _, (_, inputs, targets) in enumerate(tqdm(loader)):
             inputs = inputs.to(self._device)
             with torch.no_grad():
-                if isinstance(self._network, nn.DataParallel):
-                    vectors = torch.nn.functional.normalize(self._network.module.extract_vector(inputs), dim=-1)
-                else:
-                    vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
-                outputs_fc = self._network(inputs)["logits"].cpu()
-                outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
-                outputs_knn_manhattan = self.knn_manhattan.predict_proba(tensor2numpy(vectors))
-                cos = torch.matmul(vectors, self.features.transpose(0, 1))
-            predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
-            predicts = predicts.cpu().numpy()
-            
-            outputs_cos0 = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
-            for i in range(len(predicts)):
-                for j, k in enumerate(predicts[i]):
-                    outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
-                    
-            outputs_cos1 = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
-            for i in range(len(predicts)):
-                for j, k in enumerate(predicts[i]):
-                    outputs_cos[i][self.labelmap[k]] += 1
-            
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos0), dim=0) + \
-                     0.9*torch.nn.functional.softmax(torch.from_numpy(outputs_cos1), dim=0) +\
-                     2.4*torch.nn.functional.softmax(8*outputs_fc, dim=0) + \
-                     torch.from_numpy(outputs_knn) + \
-                     torch.from_numpy(outputs_knn_manhattan) 
-
-            predicts = torch.topk(output, k=self.topk, dim=1, largest=True, sorted=True)[1]
-            targets = targets.cpu()
-            
-            
-            y_pred.append(predicts.numpy())
+                outputs = self._network(inputs)["logits"]
+            predicts = torch.topk(
+                outputs, k=self.topk, dim=1, largest=True, sorted=True
+            )[
+                1
+            ]  # [bs, topk]
+            y_pred.append(predicts.cpu().numpy())
             y_true.append(targets.cpu().numpy())
 
         return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
