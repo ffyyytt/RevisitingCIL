@@ -1,4 +1,3 @@
-import sklearn
 import logging
 import numpy as np
 import torch
@@ -8,19 +7,21 @@ from tqdm import tqdm
 from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from skmultiflow.lazy import KNNClassifier
 from utils.inc_net import IncrementalNet,SimpleCosineIncrementalNet,SimpleVitNet
 from models.base import BaseLearner
 from utils.toolkit import target2onehot, tensor2numpy
 
 
 num_workers = 8
-batch_size=128
 
 class Learner(BaseLearner):
     def __init__(self, args):
         super().__init__(args)
         self._network = SimpleVitNet(args, True)
+        self.batch_size = args["batch_size"]
+        self. init_lr=args["init_lr"]
+        self.weight_decay=args["weight_decay"] if args["weight_decay"] is not None else 0.0005
+        self.min_lr=args['min_lr'] if args['min_lr'] is not None else 1e-8
         self.args=args
 
     def after_task(self):
@@ -38,22 +39,7 @@ class Learner(BaseLearner):
                 embedding=model.convnet(data)
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
-
-                if not self.knn:
-                    self.knn = KNNClassifier(n_neighbors=1, 
-                                             max_window_size=100000,
-                                             leaf_size=1000,
-                                             metric="euclidean")
-                    self.knn_manhattan = KNNClassifier(n_neighbors=1, 
-                                                       max_window_size=1000000, 
-                                                       leaf_size=1000,
-                                                       metric="manhattan")
-                    self.features = embedding
-                    self.labels = label
-                else:
-                    self.features = torch.cat((self.features, embedding), dim=0)
-                    self.labels = torch.cat((self.labels, label), dim=0)
-        embedding_list = torch.nn.functional.normalize(torch.cat(embedding_list, dim=0), dim=-1)
+        embedding_list = torch.cat(embedding_list, dim=0)
         label_list = torch.cat(label_list, dim=0)
 
         class_list=np.unique(self.train_dataset.labels)
@@ -62,14 +48,8 @@ class Learner(BaseLearner):
             # print('Replacing...',class_index)
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
-            embedding=torch.nn.functional.normalize(embedding, dim=-1)
-            cos = torch.matmul(embedding, embedding.transpose(0, 1))
-            cos = (1-torch.mean(cos, dim = 1))**2.8
-            proto = (cos[:, None]*embedding).mean(0) / cos.mean(0)
+            proto=embedding.mean(0)
             self._network.fc.weight.data[class_index]=proto
-            
-        self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
-        self.knn_manhattan.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
    
@@ -82,26 +62,51 @@ class Learner(BaseLearner):
         train_dataset = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),source="train", mode="train", )
         self.train_dataset=train_dataset
         self.data_manager=data_manager
-        self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers)
         test_dataset = data_manager.get_dataset(np.arange(0, self._total_classes), source="test", mode="test" )
-        self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=num_workers)
 
         train_dataset_for_protonet=data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),source="train", mode="test", )
-        self.train_loader_for_protonet = DataLoader(train_dataset_for_protonet, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        self.train_loader_for_protonet = DataLoader(train_dataset_for_protonet, batch_size=self.batch_size, shuffle=True, num_workers=num_workers)
 
         if len(self._multiple_gpus) > 1:
             print('Multiple GPUs')
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
-        self._train(self.train_loader, self.test_loader, self.train_loader_for_protonet)
+        if self.args['optimizer']=='sgd':
+            optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=self.init_lr,weight_decay=self.weight_decay)
+        elif self.args['optimizer']=='adam':
+            optimizer=optim.AdamW(self._network.parameters(), lr=self.init_lr, weight_decay=self.weight_decay)
+        scheduler=optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
+        
+        self._train(self.train_loader, self.test_loader, self.train_loader_for_protonet, optimizer, scheduler)
         if len(self._multiple_gpus) > 1:
             self._network = self._network.module
 
-    def _train(self, train_loader, test_loader, train_loader_for_protonet):
-        
+    def _train(self, train_loader, test_loader, train_loader_for_protonet, optimizer, scheduler):
         self._network.to(self._device)
         self.replace_fc(train_loader_for_protonet, self._network, None)
+        for epoch in range(self.args['tuned_epoch']):
+            self._network.train()
+            losses = 0.0
+            correct, total = 0, 0
+            for i, (_, inputs, targets) in enumerate(tqdm(train_loader)):
+                inputs, targets = inputs.to(self._device), targets.to(self._device)
+                cos = self._network(inputs)["logits"]
+                theta = torch.acos(cos)
+                cos_add = torch.cos(theta + 0.3)
+                label = torch.nn.functional.one_hot(targets, num_classes=self._total_classes)
 
-        
-    
+                logits = label*cos_add + (1 - label)*cos
+                logits = torch.nn.functional.softmax(8*logits, dim = 1)
 
-   
+                loss = F.cross_entropy(logits, targets)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                losses += loss.item()
+
+                _, preds = torch.max(cos, dim=1)
+                correct += preds.eq(targets.expand_as(preds)).cpu().sum()
+                total += len(targets)
+            print(correct/total, loss.item())
+            scheduler.step()
