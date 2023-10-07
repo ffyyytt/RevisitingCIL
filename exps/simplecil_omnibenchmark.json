@@ -12,12 +12,12 @@
     "device": ["0"],
     "seed": [1993],
     
-    "tuned_epoch":0,
-    "init_lr":0.01,
-    "batch_size":256,
+    "tuned_epoch":5,
+    "init_lr":1e-7,
+    "batch_size":64,
     "weight_decay":0.05,
-    "min_lr":1e-8,
-    "optimizer":"sgd",
+    "min_lr":1e-12,
+    "optimizer":"adam",
     "vpt_type":"shallow",
     "prompt_token_num":3
 }
