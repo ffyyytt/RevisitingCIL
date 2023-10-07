@@ -99,7 +99,7 @@ class Learner(BaseLearner):
 
     def _train(self, train_loader, test_loader, train_loader_for_protonet, optimizer, scheduler):
         self._network.to(self._device)
-        self.replace_fc(train_loader_for_protonet, self._network, None)
+        # self.replace_fc(train_loader_for_protonet, self._network, None)
         for epoch in range(self.args['tuned_epoch']):
             self._network.train()
             losses = 0.0
