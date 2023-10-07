@@ -13,6 +13,7 @@ batch_size = 64
 
 class BaseLearner(object):
     def __init__(self, args):
+        self.knn = False
         self._cur_task = -1
         self._known_classes = 0
         self._total_classes = 0
