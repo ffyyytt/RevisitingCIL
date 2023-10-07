@@ -7,6 +7,7 @@ from tqdm import tqdm
 from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from skmultiflow.lazy import KNNClassifier
 from utils.inc_net import IncrementalNet,SimpleCosineIncrementalNet,SimpleVitNet
 from models.base import BaseLearner
 from utils.toolkit import target2onehot, tensor2numpy
@@ -39,6 +40,18 @@ class Learner(BaseLearner):
                 embedding=model.convnet(data)
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
+
+                if not self.knn:
+                    self.knn = KNNClassifier(n_neighbors=1, 
+                                             max_window_size=100000,
+                                             leaf_size=1000,
+                                             metric="euclidean")
+                    self.features = embedding
+                    self.labels = label
+                else:
+                    self.features = torch.cat((self.features, embedding), dim=0)
+                    self.labels = torch.cat((self.labels, label), dim=0)
+
         embedding_list = torch.cat(embedding_list, dim=0)
         label_list = torch.cat(label_list, dim=0)
 
@@ -50,6 +63,8 @@ class Learner(BaseLearner):
             embedding=embedding_list[data_index]
             proto=embedding.mean(0)
             self._network.fc.weight.data[class_index]=proto
+
+        self.knn.partial_fit(embedding_list.detach().cpu().numpy(), label_list)
         return model
 
    
