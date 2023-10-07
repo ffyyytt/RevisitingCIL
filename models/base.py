@@ -150,12 +150,31 @@ class BaseLearner(object):
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
     def _eval_cnn(self, loader):
+        self.labelmap = {i:x for i, x in enumerate(self.labels)}
         self._network.eval()
         y_pred, y_true = [], []
         for _, (_, inputs, targets) in enumerate(tqdm(loader)):
             inputs = inputs.to(self._device)
             with torch.no_grad():
-                outputs = self._network(inputs)["logits"]
+                if isinstance(self._network, nn.DataParallel):
+                    vectors = torch.nn.functional.normalize(self._network.module.extract_vector(inputs), dim=-1)
+                else:
+                    vectors = torch.nn.functional.normalize(self._network.extract_vector(inputs), dim=-1)
+                outputs_fc = self._network(inputs)["logits"].cpu()
+            outputs_knn = self.knn.predict_proba(tensor2numpy(vectors))
+            cos = torch.matmul(vectors, self.features.transpose(0, 1))
+            predicts = torch.topk(cos, k=20*self.topk, dim=1, largest=True, sorted=True)[1]
+            predicts = predicts.cpu().numpy()
+            outputs_cos = np.zeros([len(predicts), len(set(self.labels.cpu().numpy().tolist()))])
+            for i in range(len(predicts)):
+                for j, k in enumerate(predicts[i]):
+                    outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
+
+            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
+                     2.2*torch.nn.functional.softmax(torch.from_numpy(outputs_fc), dim=0) +\
+                     torch.from_numpy(outputs_knn) + \
+
+            
             predicts = torch.topk(
                 outputs, k=self.topk, dim=1, largest=True, sorted=True
             )[
