@@ -170,7 +170,7 @@ class BaseLearner(object):
                 for j, k in enumerate(predicts[i]):
                     outputs_cos[i][self.labelmap[k]] += 1/(2.5**j)
 
-            output = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
+            outputs = torch.nn.functional.softmax(torch.from_numpy(outputs_cos), dim=0) + \
                      2.2*torch.nn.functional.softmax(torch.from_numpy(outputs_fc), dim=0) +\
                      torch.from_numpy(outputs_knn) + \
 
