@@ -125,3 +125,4 @@ class Learner(BaseLearner):
                 total += len(targets)
             print(correct/total, loss.item())
             scheduler.step()
+        self.replace_fc(train_loader_for_protonet, self._network, None)
